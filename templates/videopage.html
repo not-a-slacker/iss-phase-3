@@ -182,9 +182,9 @@
 
       <label for="quality">Select Quality:</label>
       <select id="quality">
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
+        <option value="20">Low</option>
+        <option value="60">Medium</option>
+        <option value="90">High</option>
       </select>
     </section>
 
@@ -249,6 +249,7 @@
         var duration = document.getElementById('duration').value; // Get the duration value
         var resolution = document.getElementById("resolution").value;
         var width = 0, height = 0;
+        var quality = document.getElementById("quality").value;
 
         if(selectedImages.length === 0){
           alert('Please select at least one image');
@@ -272,7 +273,7 @@
         $.ajax({
           url: '/create_video', // The endpoint where the compile_images_to_video function is
           type: 'POST',
-          data: JSON.stringify({images: selectedImages, audios: selectedAudios, fps: duration, width: width, height: height}), // Send the selected images, audios and duration to the server
+          data: JSON.stringify({images: selectedImages, audios: selectedAudios, fps: duration, width: width, height: height, quality: quality}), // Send the selected images, audios and duration to the server
           contentType: 'application/json',
           success: function(response){
             // Handle the response from the server

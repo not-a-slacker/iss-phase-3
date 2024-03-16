@@ -533,6 +533,7 @@ def create_video():
     width = int(data['width'])
     height = int(data['height'])
     audios=data['audios']
+    quality_val=int(data['quality'])
 
     try:
 
@@ -553,6 +554,12 @@ def create_video():
             # Resize the image to match the video dimensions
             img = img.resize((width, height), resample=Image.BICUBIC)
 
+            # Compress the image to a desired quality
+            
+            img_io = io.BytesIO()
+            img.save(img_io, 'JPEG', quality=quality_val)
+            img = Image.open(img_io)
+            
             # Convert PIL Image to numpy array
             img_array = np.array(img)
 
@@ -560,9 +567,14 @@ def create_video():
             video_clips.append(img_array)
 
         # Create ImageSequenceClip from the list of image arrays
-        final_clip = ImageSequenceClip(video_clips, fps=fps)
+        if video_clips:
+            final_clip = ImageSequenceClip(video_clips, fps=fps)
+        else:
+            print("No valid images provided.")
+            return jsonify({"status": "failed", "message": "No valid images provided."})
 
-        if audios != "None":
+       
+        if audios != []:
             audio_clips = []
 
             for audio in audios:
@@ -588,7 +600,7 @@ def create_video():
 
             # Add the looped audio clip to the final video clip
             final_clip = final_clip.set_audio(looped_audio)
-
+        
         # Define the output path for the final video
         output_path = os.path.join('static', 'output_video.mp4')
 
