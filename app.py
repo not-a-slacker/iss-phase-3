@@ -493,7 +493,7 @@ def create_video():
 
             # Resize the image to match the video dimensions
             img = cv2.resize(img, (width, height))
-
+    
             # Write the frame to the video file
             out.write(img)
 
