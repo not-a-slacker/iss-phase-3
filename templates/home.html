@@ -267,7 +267,7 @@
 
   <nav class="navbar">
     <div class="logo">
-      <img class="header-logo-image" src="../static/img/logo.svg" alt="Logo"
+      <img class="header-logo-image" src="/static/img/logo.svg" alt="Logo"
         style="width: 30px; height: 30px; margin-top: 20px;">
       <span class="header-title">Username: Email</span>
     </div>
@@ -376,6 +376,7 @@
           if (data.status === 'success') {
             console.log('Image uploaded successfully!');
             closePopup();
+            location.reload();  
           } else {
             console.error('Image upload failed!');
           }

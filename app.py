@@ -5,12 +5,11 @@ import hashlib
 from werkzeug.utils import secure_filename
 import os
 import base64
-from flask_wtf import  FlaskForm
 from mutagen.mp3 import MP3
 from mutagen.wavpack import WavPack
 
 current_user=-1
-password1=input("Enter mysql database password: ")
+password1="password"
 app = Flask(__name__)
 
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -457,6 +456,111 @@ def videopage():
     print(len(image_data_list))
     return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list)
 
+import cv2
+import numpy as np
+import base64
+import io
+from flask import request
+
+
+@app.route('/create_video', methods=['POST'])
+def create_video():
+    data = request.get_json()
+    images = data['images']  # This is the selectedImages array from your JavaScript code
+    output = data['output']
+    fps = data['fps']
+
+    try:
+        
+        # Initialize variables for video dimensions
+        width = 640
+        height = 480
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter('static/output_video.mp4', fourcc, 1, (width, height))
+
+        # Iterate through the image URLs
+        for image_url in images:
+            # Decode the base64 encoded image
+            image_data = base64.b64decode(image_url.split(',')[1])
+
+            # Convert the image data to numpy array
+            nparr = np.frombuffer(image_data, np.uint8)
+
+            # Decode the image using OpenCV
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            # Resize the image to match the video dimensions
+            img = cv2.resize(img, (width, height))
+
+            # Write the frame to the video file
+            out.write(img)
+
+        # Release the VideoWriter object
+        out.release()
+        return jsonify({"status": "success"})
+        
+    except Exception as e:
+        print(f"Error creating video: {e}")
+        return jsonify({"status": "failed"})
+
+
+# from PIL import Image
+# import numpy as np
+# import cv2
+# import io
+# import base64
+
+# def compile_images_to_video(image_paths, output_video_path, fps):
+#     # Convert the first data URL to an image
+#     image_data = base64.b64decode(image_paths[0].split(',')[1])
+#     image = Image.open(io.BytesIO(image_data))
+#     frame = np.array(image)
+
+#     height, width, layers = frame.shape
+
+#     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, (width,height))
+
+#     for image_path in image_paths:
+#         # Convert each data URL to an image
+#         image_data = base64.b64decode(image_path.split(',')[1])
+#         image = Image.open(io.BytesIO(image_data))
+#         frame = np.array(image)
+
+#         # Write the frame 150 times to make it last for 5 seconds
+#         for _ in range(5 * fps):
+#             video.write(frame)
+
+#     cv2.destroyAllWindows()
+#     video.release()
+    
+# def compile_images_to_video(image_paths, output_video_path=None, fps=30):
+#     # Define a default output video path if none is provided
+#     if not output_video_path:
+#         output_video_path = 'default_output.mp4'
+
+#     # Convert the first data URL to an image
+#     image_data = base64.b64decode(image_paths[0].split(',')[1])
+#     image = Image.open(io.BytesIO(image_data))
+#     frame = np.array(image)
+
+#     height, width, _ = frame.shape  # layers is not used, so replace it with _
+
+#     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width,height))
+
+#     for image_path in image_paths:
+#         # Convert each data URL to an image
+#         image_data = base64.b64decode(image_path.split(',')[1])
+#         image = Image.open(io.BytesIO(image_data))
+#         frame = np.array(image)
+
+#         # Write the frame 150 times to make it last for 5 seconds
+#         for _ in range(5 * fps):
+#             video.write(frame)
+
+#     cv2.destroyAllWindows()
+#     video.release()
 
 if __name__ == '__main__':
     create_tables()
