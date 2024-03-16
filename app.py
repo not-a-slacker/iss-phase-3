@@ -7,9 +7,12 @@ import os
 import base64
 from mutagen.mp3 import MP3
 from mutagen.wavpack import WavPack
-import cv2
 import numpy as np
-import io
+import io 
+from PIL import Image
+from moviepy.editor import ImageSequenceClip, AudioFileClip, concatenate_audioclips,vfx
+import tempfile
+
 
 current_user=-1
 password1="password"
@@ -522,54 +525,83 @@ def videopage():
     return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list,audio_data_list=audio_data_list)
 
 
-
-
 @app.route('/create_video', methods=['POST'])
 def create_video():
     data = request.get_json()
-    images = data['images']
-    output = data['output']
+    images = data['images']  
     fps = 1/int(data['fps'])
+    width = int(data['width'])
+    height = int(data['height'])
+    audios=data['audios']
 
     try:
-        
-        # Initialize variables for video dimensions
-        width = 2560
-        height = 1440
 
-        # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter('static/output_video.mp4', fourcc, fps, (width, height))
+        video_clips = []
 
         # Iterate through the image URLs
         for image_url in images:
             # Decode the base64 encoded image
             image_data = base64.b64decode(image_url.split(',')[1])
 
-            # Convert the image data to numpy array
-            nparr = np.frombuffer(image_data, np.uint8)
+            # Convert the image data to PIL Image object
+            img = Image.open(io.BytesIO(image_data))
 
-            # Decode the image using OpenCV
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            # Ensure image is in RGB mode for compatibility
+            if img.mode != 'RGB':
+                img = img.convert('RGB')
 
-            # Define the desired dimensions for resizing
-            
+            # Resize the image to match the video dimensions
+            img = img.resize((width, height), resample=Image.BICUBIC)
 
-            # Resize the image using the INTER_AREA interpolation method
-            img = cv2.resize(img, (width,height), interpolation=cv2.INTER_AREA)
-    
-            # Write the frame to the video file
-            out.write(img)
+            # Convert PIL Image to numpy array
+            img_array = np.array(img)
 
-        # Release the VideoWriter object
-        out.release()
-        return jsonify({"status": "success"})
-        
+            # Append the image array to the video clips list
+            video_clips.append(img_array)
+
+        # Create ImageSequenceClip from the list of image arrays
+        final_clip = ImageSequenceClip(video_clips, fps=fps)
+
+        if audios != "None":
+            audio_clips = []
+
+            for audio in audios:
+                # Decode the base64 encoded audio
+                audio_data = base64.b64decode(audio['src'].split(',')[1])
+
+                # Create a temporary file and write the decoded audio data to it
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
+                    temp_audio_file.write(audio_data)
+                    temp_audio_path = temp_audio_file.name
+
+                # Load the audio clip from the temporary file
+                audio_clip = AudioFileClip(temp_audio_path)
+
+                # Append the audio clip to the audio clips list
+                audio_clips.append(audio_clip)
+
+            # Concatenate all audio clips into a single long audio clip
+            concatenated_audio = concatenate_audioclips(audio_clips)
+
+            # Loop the concatenated audio until it matches the video duration
+            looped_audio = concatenated_audio.fx(vfx.loop, duration=final_clip.duration)
+
+            # Add the looped audio clip to the final video clip
+            final_clip = final_clip.set_audio(looped_audio)
+
+        # Define the output path for the final video
+        output_path = os.path.join('static', 'output_video.mp4')
+
+        # Write the final video clip to the output path using H.264 codec
+        final_clip.write_videofile(output_path, codec='libx264')
+
+        return jsonify({"status": "success", "output": output_path})
+
     except Exception as e:
         print(f"Error creating video: {e}")
         return jsonify({"status": "failed"})
-
-
+    
+    
 if __name__ == '__main__':
     create_tables()
     flag=0

@@ -173,8 +173,10 @@
       <!-- Add select options for video resolution and quality -->
       <label for="resolution">Select Resolution:</label>
       <select id="resolution">
+        <option value="480p">480p</option>
         <option value="720p">720p</option>
         <option value="1080p">1080p</option>
+        <option value="4k">4k</option>
         <!-- Add more options as needed -->
       </select>
 
@@ -202,8 +204,8 @@
       
     $(document).ready(function(){
       var selectedImages = [];
-
-
+      var selectedAudios = []; // Array to store selected audio files
+      var order = 0;
       $('.selectable-image').on('click', function(){
           $(this).toggleClass('selected');
 
@@ -219,43 +221,72 @@
           console.log(selectedImages); //FOR TESTING
       });
 
-        $('.codepen-button').on('click', function(e){
-          e.preventDefault(); // Prevent the default action of the button
-
-          var duration = document.getElementById('duration').value; // Get the duration value
-          
-          $.ajax({
-            url: '/create_video', // The endpoint where the compile_images_to_video function is
-            type: 'POST',
-            data: JSON.stringify({images: selectedImages, output: 'output.mp4', fps: duration}), // Send the selectedImages array to the server
-            contentType: 'application/json',
-            success: function(response){
-              // Handle the response from the server
-              console.log(response);
-            },
-            error: function(error){
-              // Handle any errors
-              console.log(error);
-            }
-          });
-        });
-      });
-
-      $(document).ready(function(){
-        var order = 0;
-        $('.audio-checkbox').on('change', function(){
-          if($(this).is(':checked')){
+      $('.audio-checkbox').on('change', function(){
+        if($(this).is(':checked')){
             order++;
+            selectedAudios.push({src: $(this).data('src'), order: order}); // Add the audio file and its order to selectedAudios
             $(this).nextAll('.order').first().text('Order: ' + order);
-          } else {
+        } else {
             $(this).nextAll('.order').first().text('');
+            var index = selectedAudios.findIndex(audio => audio.src === $(this).data('src'));
+            if (index > -1) {
+                selectedAudios.splice(index, 1); // Remove the audio file from selectedAudios
+            }
             $('.audio-checkbox:checked').each(function(index){
-              $(this).nextAll('.order').first().text('Order: ' + (index + 1));
+                $(this).nextAll('.order').first().text('Order: ' + (index + 1));
+                var audioIndex = selectedAudios.findIndex(audio => audio.src === $(this).data('src'));
+                if (audioIndex > -1) {
+                    selectedAudios[audioIndex].order = index + 1; // Update the order of the audio file in selectedAudios
+                }
             });
             order--;
+        }
+      });
+
+      $('.codepen-button').on('click', function(e){
+        e.preventDefault(); // Prevent the default action of the button
+
+        var duration = document.getElementById('duration').value; // Get the duration value
+        var resolution = document.getElementById("resolution").value;
+        var width = 0, height = 0;
+
+        if(selectedImages.length === 0){
+          alert('Please select at least one image');
+          return;
+        }
+
+        if(resolution === '480p'){
+          width = 854;
+          height = 480;
+        } else if(resolution === '720p'){
+          width = 1280;
+          height = 720;
+        } else if(resolution === '1080p'){
+          width = 1920;
+          height = 1080;
+        } else if(resolution === '4k'){
+          width = 3840;
+          height = 2160;
+        }
+        
+        $.ajax({
+          url: '/create_video', // The endpoint where the compile_images_to_video function is
+          type: 'POST',
+          data: JSON.stringify({images: selectedImages, audios: selectedAudios, fps: duration, width: width, height: height}), // Send the selected images, audios and duration to the server
+          contentType: 'application/json',
+          success: function(response){
+            // Handle the response from the server
+            console.log(response);
+          },
+          error: function(error){
+            // Handle any errors
+            console.log(error);
           }
         });
-      }); 
+      });
+    });
+
+      
        // // JavaScript code for handling image selection
       // const imageThumbnails = document.querySelectorAll(".image-thumbnail");
 
