@@ -1,0 +1,38 @@
+@app.route('/create_video', methods=['GET','POST'])
+def create_video():
+    try:
+        # Get image URLs from the request
+        user_id=current_user
+        image_urls = get_images(user_id)
+
+        # Initialize variables for video dimensions
+        width = 640
+        height = 480
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        out = cv2.VideoWriter('static/output_video.mp4', fourcc, 20, (width, height))
+
+        # Iterate through the image URLs
+        for image_url in image_urls:
+            # Decode the base64 encoded image
+            image_data = base64.b64decode(image_url.split(',')[1])
+
+            # Convert the image data to numpy array
+            nparr = np.frombuffer(image_data, np.uint8)
+
+            # Decode the image using OpenCV
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+            # Resize the image to match the video dimensions
+            img = cv2.resize(img, (width, height))
+
+            # Write the frame to the video file
+            out.write(img)
+
+        # Release the VideoWriter object
+        out.release()
+        return redirect(url_for('display_video'))
+    except Exception as e:
+        print(f"Error creating video: {e}")
+        return jsonify({"status": "failed"})
