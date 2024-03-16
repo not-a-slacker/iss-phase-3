@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Video Maker</title>
+
+    <link rel="stylesheet" href="../static/css/videopage.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/videopage.css') }}"/>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+
+  </head>
+  <style>
+    
+    .navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    background-color: #14161a;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    }
+
+</style>
+
+  <body>
+
+      <nav class="navbar">
+        <div class="logo">
+          <img class="header-logo-image" src="../static/img/logo.svg" alt="Logo" style="width: 30px; height: 30px;">
+          <span class="header-title">Video Maker</span>
+        </div>
+        <div class="button-container">
+          <a class="codepen-button" style="text-decoration:none;"><span>Create Video</span></a>
+          <a class="codepen-button2" href="{{ url_for('index') }}" style="text-decoration:none;"><span>Logout</span></a>
+        </div>
+      </nav>
+
+    <section id="photoSelection" class="section-container">
+      <div class="icon-heading-container">
+        <lord-icon
+          src="https://cdn.lordicon.com/mwtymjmp.json"
+          trigger="loop"
+          delay="2000"
+          style="width:40px;height:40px">
+        </lord-icon>
+        <h2>Select Photos</h2>
+      </div>
+      <div class="predefined-images">
+
+        <!-- Add predefined image thumbnails -->
+      {% for image_data in image_data_list %}
+          <img src="{{ image_data }}" alt="User Image">
+      {% endfor %}
+        
+
+      </div>
+    </section>
+
+    <section id="backgroundMusic" class="section-container">
+
+      <div class="icon-heading-container">
+        <lord-icon
+          src="https://cdn.lordicon.com/qaexljue.json"
+          trigger="loop"
+          delay="1000"
+          state="hover-pinch"
+          style="width:40px;height:40px">
+        </lord-icon>
+      <h2>Add Background Music</h2>
+      </div>
+      <button id="upload-button">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 3H12H8C6.34315 3 5 4.34315 5 6V18C5 19.6569 6.34315 21 8 21H11M13.5 3L19 8.625M13.5 3V7.625C13.5 8.17728 13.9477 8.625 14.5 8.625H19M19 8.625V11.8125" stroke="#fffffff" stroke-width="2"></path>
+          <path d="M17 15V18M17 21V18M17 18H14M17 18H20" stroke="#fffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        ADD FILE 
+      </button>
+      <input type="file" id="file-input" accept="audio/*" style="display: none;" />
+    </section>
+
+    <section id="durationSettings" class="section-container">
+      
+      <div class="icon-heading-container">
+        <lord-icon
+          src="https://cdn.lordicon.com/aqrzgjfy.json"
+          trigger="loop"
+          delay="2000"
+          style="width:40px;height:40px">
+        </lord-icon>
+        <h2>Set Duration</h2>
+      </div>
+      <!-- Add input elements for setting duration -->
+      <label for="duration">Duration per Image (seconds):</label>
+      <input type="number" id="duration" name="duration" min="1" value="5" />
+    </section>
+
+    <section id="effects" class="section-container">
+        
+      <div class="icon-heading-container">
+        
+          <lord-icon
+              src="https://cdn.lordicon.com/ilsmzilo.json"
+              trigger="loop"
+              delay="1500"
+              style="width:40px;height:40px">
+          </lord-icon>
+        <h2>Effects</h2>
+      </div>
+        <!-- Add select options for set effects -->
+        <label for="setEffects">Set Effects:</label>
+        <select id="setEffects">
+            <option value="effect1">Effect 1</option>
+            <option value="effect2">Effect 2</option>
+            <!-- Add more options as needed -->
+        </select>
+
+        <!-- Add select options for transition effects -->
+        <label for="transitionEffects">Transition Effects:</label>
+        <select id="transitionEffects" >
+            <option value="fade">Fade</option>
+            <option value="slide">Slide</option>
+            <!-- Add more options as needed -->
+        </select>
+    </section>
+
+    <!-- <section id="preview" class="section-container">
+        <h2>Preview</h2>
+        <div class="video-controls"> -->
+            <!-- Add fast forward and rewind icons -->
+            <!-- <button id="rewind"><img src="dist/images/rewind.png" alt="Rewind"></button>
+            <video controls> -->
+                <!-- Add source elements for video preview -->
+                <!-- <source src="dist/images/video.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            <button id="fastForward"><img src="dist/images/fast-forward.png" alt="Fast Forward"></button>
+        </div>
+    </section> -->
+
+    <section id="outputSettings" class="section-container">
+      <div class="icon-heading-container">
+        <lord-icon
+          src="https://cdn.lordicon.com/whjkutcn.json"
+          trigger="loop"
+          delay="1000"
+          style="width:40px;height:40px">
+        </lord-icon>
+        <h2>Output Settings</h2>
+      </div>
+      <!-- Add select options for video resolution and quality -->
+      <label for="resolution">Select Resolution:</label>
+      <select id="resolution">
+        <option value="720p">720p</option>
+        <option value="1080p">1080p</option>
+        <!-- Add more options as needed -->
+      </select>
+
+      <label for="quality">Select Quality:</label>
+      <select id="quality">
+        <option value="low">Low</option>
+        <option value="medium">Medium</option>
+        <option value="high">High</option>
+      </select>
+    </section>
+
+    
+
+    <!-- Add your scripts at the end of the body -->
+    <script src="https://cdn.lordicon.com/lordicon.js"></script>
+    <script>
+      // for file upload button
+      document.getElementById('upload-button').addEventListener('click', function() {
+          document.getElementById('file-input').click();
+        });
+
+      // JavaScript code for handling image selection
+      const imageThumbnails = document.querySelectorAll(".image-thumbnail");
+
+      imageThumbnails.forEach((thumbnail) => {
+        thumbnail.addEventListener("click", () => {
+          thumbnail.classList.toggle("selected");
+        });
+      });
+
+      // // Additional JavaScript for Fast Forward and Rewind buttons
+      //   const video = document.querySelector('video');
+      //   const fastForwardBtn = document.getElementById('fastForward');
+      //   const rewindBtn = document.getElementById('rewind');
+
+      //   fastForwardBtn.addEventListener('click', () => {
+      //       video.currentTime += 5; // Adjust as needed
+      //   });
+
+      //   rewindBtn.addEventListener('click', () => {
+      //       video.currentTime -= 5; // Adjust as needed
+      //   });
+
+        
+    </script>
+  </body>
+</html>
