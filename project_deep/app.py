@@ -9,11 +9,11 @@ from flask_wtf import  FlaskForm
 from mutagen.mp3 import MP3
 from mutagen.wavpack import WavPack
 
-
+current_user=-1
 password1=input("Enter mysql database password: ")
 app = Flask(__name__)
 
-app.config['UPLOAD_FOLDER'] = 'upload'
+app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['DISPLAY_FOLDER'] = 'display'
 
@@ -372,6 +372,8 @@ def login():
         if a==0:
             return render_template('login.html', login_failed=True)
         else:
+            global current_user
+            current_user=a
             return redirect(url_for('home',user_id=a))
 
         
@@ -447,9 +449,12 @@ def display_image(user_id, image_id):
 def admin():
     return render_template('admin.html',target="_self")
 
-@app.route('/videopage/user/<int:user_id>')
-def videopage(user_id):
+@app.route('/videopage/user')
+def videopage():
+    global current_user
+    user_id=current_user
     image_data_list = get_images(user_id)
+    print(len(image_data_list))
     return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list)
 
 

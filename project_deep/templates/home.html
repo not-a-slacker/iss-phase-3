@@ -299,7 +299,7 @@
 
       <section id="createVideoContainer">
         <img src="/static/img/icon-play.png" alt="Create Video Icon">
-        <a href="{{ url_for('videopage') }}">
+        <a href="{{ url_for('videopage')}}">
           <button class="button">Create Video</button></a>
       </section>
     </div>
@@ -383,7 +383,6 @@
         .catch(error => {
           console.error('Error uploading image:', error);
         });
-        location.reload();
     }
     
     function displayAllImages(user_id) {
