@@ -79,10 +79,14 @@
       
       </div>
       {% for audio_data in audio_data_list %}
-      <audio controls="controls" autobuffer="autobuffer" >
-        <source src="{{audio_data}}"/>
-    </audio>
-    <br>
+      <div class="audio-container">
+        <input type="checkbox" class="audio-checkbox" data-src="{{audio_data}}">
+        <audio class="audio" controls="controls" autobuffer="autobuffer">
+          <source src="{{audio_data}}"/>
+        </audio>
+        <span class="order"></span>
+      </div>
+      <br>
       {% endfor %}
       <!--
         <button id="upload-button">
@@ -110,7 +114,7 @@
       </div>
       <!-- Add input elements for setting duration -->
       <label for="duration">Duration per Image (seconds):</label>
-      <input type="number" id="duration" name="duration" min="1" value="5" />
+      <input type="number" id="duration" name="duration" min="1" value="3" />
     </section>
 
     <section id="effects" class="section-container">
@@ -199,6 +203,7 @@
     $(document).ready(function(){
       var selectedImages = [];
 
+
       $('.selectable-image').on('click', function(){
           $(this).toggleClass('selected');
 
@@ -217,10 +222,12 @@
         $('.codepen-button').on('click', function(e){
           e.preventDefault(); // Prevent the default action of the button
 
+          var duration = document.getElementById('duration').value; // Get the duration value
+          
           $.ajax({
             url: '/create_video', // The endpoint where the compile_images_to_video function is
             type: 'POST',
-            data: JSON.stringify({images: selectedImages, output: 'output.mp4', fps: 30}), // Send the selectedImages array to the server
+            data: JSON.stringify({images: selectedImages, output: 'output.mp4', fps: duration}), // Send the selectedImages array to the server
             contentType: 'application/json',
             success: function(response){
               // Handle the response from the server
@@ -233,6 +240,22 @@
           });
         });
       });
+
+      $(document).ready(function(){
+        var order = 0;
+        $('.audio-checkbox').on('change', function(){
+          if($(this).is(':checked')){
+            order++;
+            $(this).nextAll('.order').first().text('Order: ' + order);
+          } else {
+            $(this).nextAll('.order').first().text('');
+            $('.audio-checkbox:checked').each(function(index){
+              $(this).nextAll('.order').first().text('Order: ' + (index + 1));
+            });
+            order--;
+          }
+        });
+      }); 
        // // JavaScript code for handling image selection
       // const imageThumbnails = document.querySelectorAll(".image-thumbnail");
 

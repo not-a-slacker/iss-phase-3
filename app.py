@@ -28,6 +28,7 @@ database = "iss_project"
 
 import os
 
+
 def delete_files_in_directory(directory_path):
     try:
         for filename in os.listdir(directory_path):
@@ -526,19 +527,19 @@ def videopage():
 @app.route('/create_video', methods=['POST'])
 def create_video():
     data = request.get_json()
-    images = data['images']  # This is the selectedImages array from your JavaScript code
+    images = data['images']
     output = data['output']
-    fps = data['fps']
+    fps = 1/int(data['fps'])
 
     try:
         
         # Initialize variables for video dimensions
-        width = 640
-        height = 480
+        width = 2560
+        height = 1440
 
         # Define the codec and create VideoWriter object
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter('static/output_video.mp4', fourcc, 1, (width, height))
+        out = cv2.VideoWriter('static/output_video.mp4', fourcc, fps, (width, height))
 
         # Iterate through the image URLs
         for image_url in images:
@@ -551,8 +552,11 @@ def create_video():
             # Decode the image using OpenCV
             img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-            # Resize the image to match the video dimensions
-            img = cv2.resize(img, (width, height))
+            # Define the desired dimensions for resizing
+            
+
+            # Resize the image using the INTER_AREA interpolation method
+            img = cv2.resize(img, (width,height), interpolation=cv2.INTER_AREA)
     
             # Write the frame to the video file
             out.write(img)
