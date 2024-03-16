@@ -7,6 +7,9 @@ import os
 import base64
 from mutagen.mp3 import MP3
 from mutagen.wavpack import WavPack
+import cv2
+import numpy as np
+import io
 
 current_user=-1
 password1="password"
@@ -224,7 +227,41 @@ def search_for_user(username_user,password_user):
             print("MySQL connection closed")
             return 0
     return 0
+def get_user_details(user_id):
+    try:
+        connection = mysql.connector.connect(
+            host=hostname,
+            user=username,
+            password=password,
+            database=database
+        )
+        if connection.is_connected():
+            cursor=connection.cursor(buffered=True)
+            query="SELECT * FROM user_details WHERE user_id=%s"
+            data=(user_id,)
+            cursor.execute(query,data)
+            connection.commit()
+            row=cursor.fetchone()
+            if row:
+                connection.close()
+                print("MySQL connection closed")
+                return row
+            
+            else:
+                connection.close()
+                print("MySQL connection closed")
+                return 0
 
+    except mysql.connector.Error as e:
+            print(f"Error: {e}")
+            return None
+    finally:
+        if 'connection' in locals() and connection.is_connected():
+            connection.close()
+            print("MySQL connection closed")
+            return None
+
+    
 def save_to_database(file_path, a,extension):
     try:
         connection = mysql.connector.connect(
@@ -254,7 +291,33 @@ def save_to_database(file_path, a,extension):
     finally:
         if 'connection' in locals() and connection.is_connected():
             connection.close()
+def get_audio():
+    try:
+        connection = mysql.connector.connect(
+            host=hostname,
+            user=username,
+            password=password,
+            database=database
+        )
+        cursor = connection.cursor()
 
+        # Retrieve images for the specified user_id from the database
+        query = "SELECT audio_data from audio;"
+        cursor.execute(query)
+        audios = cursor.fetchall()
+
+        audio_data_list = []
+        for audio_data in audios:
+            # Convert image_data to base64 for embedding in HTML
+            encoded_audio=(base64.b64encode(audio_data[0])).decode('utf-8')
+            print(encoded_audio[:10])
+            audio_data_list.append(f"data:audio/mp3;base64,{encoded_audio}")
+
+        return audio_data_list
+
+    finally:
+        if 'connection' in locals() and connection.is_connected():
+            connection.close()
 def get_images(user_id):
     try:
         connection = mysql.connector.connect(
@@ -428,9 +491,9 @@ def home(user_id):
         return jsonify({"status": "failed"})
     else:
         image_data_list = get_images(user_id)
-
+        row=get_user_details(user_id)
         # Render HTML to display images
-        return render_template('home.html', user_id=user_id,image_data_list=image_data_list )
+        return render_template('home.html', user_id=user_id,image_data_list=image_data_list,row=row )
     
 
 
@@ -453,14 +516,11 @@ def videopage():
     global current_user
     user_id=current_user
     image_data_list = get_images(user_id)
+    audio_data_list=get_audio()
     print(len(image_data_list))
-    return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list)
+    return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list,audio_data_list=audio_data_list)
 
-import cv2
-import numpy as np
-import base64
-import io
-from flask import request
+
 
 
 @app.route('/create_video', methods=['POST'])
@@ -505,62 +565,6 @@ def create_video():
         print(f"Error creating video: {e}")
         return jsonify({"status": "failed"})
 
-
-# from PIL import Image
-# import numpy as np
-# import cv2
-# import io
-# import base64
-
-# def compile_images_to_video(image_paths, output_video_path, fps):
-#     # Convert the first data URL to an image
-#     image_data = base64.b64decode(image_paths[0].split(',')[1])
-#     image = Image.open(io.BytesIO(image_data))
-#     frame = np.array(image)
-
-#     height, width, layers = frame.shape
-
-#     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'DIVX'), fps, (width,height))
-
-#     for image_path in image_paths:
-#         # Convert each data URL to an image
-#         image_data = base64.b64decode(image_path.split(',')[1])
-#         image = Image.open(io.BytesIO(image_data))
-#         frame = np.array(image)
-
-#         # Write the frame 150 times to make it last for 5 seconds
-#         for _ in range(5 * fps):
-#             video.write(frame)
-
-#     cv2.destroyAllWindows()
-#     video.release()
-    
-# def compile_images_to_video(image_paths, output_video_path=None, fps=30):
-#     # Define a default output video path if none is provided
-#     if not output_video_path:
-#         output_video_path = 'default_output.mp4'
-
-#     # Convert the first data URL to an image
-#     image_data = base64.b64decode(image_paths[0].split(',')[1])
-#     image = Image.open(io.BytesIO(image_data))
-#     frame = np.array(image)
-
-#     height, width, _ = frame.shape  # layers is not used, so replace it with _
-
-#     video = cv2.VideoWriter(output_video_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width,height))
-
-#     for image_path in image_paths:
-#         # Convert each data URL to an image
-#         image_data = base64.b64decode(image_path.split(',')[1])
-#         image = Image.open(io.BytesIO(image_data))
-#         frame = np.array(image)
-
-#         # Write the frame 150 times to make it last for 5 seconds
-#         for _ in range(5 * fps):
-#             video.write(frame)
-
-#     cv2.destroyAllWindows()
-#     video.release()
 
 if __name__ == '__main__':
     create_tables()
