@@ -258,7 +258,11 @@ def login():
         username_login=request.form['username']
         password_login=request.form['password']
         if username_login=='admin' and password_login=='admin':
-            return redirect(url_for('admin'))
+            
+            token = generate_token(0)
+            response = make_response(redirect(url_for('admin')))
+            response.set_cookie('jwtToken', token)
+            return response
         hashed_password_login = hashlib.sha256(password_login.encode()).hexdigest()
         a=search_for_user(username_login,hashed_password_login)
         delete_files_in_directory(app.config['UPLOAD_FOLDER'])
@@ -359,7 +363,7 @@ def admin():
 
     username = verify_token(token)
 
-    if username:
+    if username==0:
         return render_template('admin.html',target="_self")
     else:
         return jsonify({'message': 'Invalid token'}), 401
