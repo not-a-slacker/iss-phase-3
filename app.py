@@ -1,6 +1,5 @@
-from flask import Flask, request, jsonify, redirect, url_for,send_from_directory
+from flask import Flask, request, jsonify, redirect, url_for,send_from_directory,make_response
 from flask import render_template
-import mysql.connector
 import hashlib
 from werkzeug.utils import secure_filename
 import os
@@ -19,8 +18,10 @@ import cv2
 import numpy as np
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.dialects.mysql import BLOB
-import os
-
+import datetime
+import jwt
+import secrets
+import string
 
 current_user=-1
 app = Flask(__name__)
@@ -35,6 +36,23 @@ Session = sessionmaker(bind=engine)
 
 
 
+# Secret key for JWT
+app.config['SECRET_KEY'] = secrets.token_urlsafe(32)
+
+def generate_token(username):
+    expiry_date = datetime.datetime.utcnow() + datetime.timedelta(days=1)
+    payload = {'username': username, 'exp': expiry_date}
+    token = jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+    return token
+
+def verify_token(token):
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload['username']
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
 
 
@@ -228,20 +246,14 @@ def get_images(user_id):
         session.close()
 
 
-
-
-
-
-
-
 @app.route('/')
 @app.route('/index')
 def index():
     return render_template('index.html',target="_self")
 
+
 @app.route('/login',methods=['GET','POST'])
 def login():
-    
     if request.method=='POST':
         username_login=request.form['username']
         password_login=request.form['password']
@@ -254,11 +266,19 @@ def login():
             return render_template('login.html', login_failed=True)
         else:
             global current_user
-            current_user=a
-            return redirect(url_for('home',user_id=a))
-
+            current_user = a
+            token = generate_token(current_user)
+            response = make_response(redirect(url_for('home', user_id=a)))
+            response.set_cookie('jwtToken', token)
+            return response
         
     return render_template('login.html',target="_self")
+
+@app.route('/logout')
+def logout():
+    response = make_response(redirect(url_for('index')))
+    response.set_cookie('jwtToken', '', max_age=0)
+    return response
 
 @app.route('/signup',methods=['GET','POST'])
 def signup():
@@ -285,48 +305,64 @@ def signup():
 
 
     return render_template('signup.html', password_mismatch=False,user_found=False,target="_self")
-
-@app.route('/home/user/<int:user_id>',methods=['GET','POST'])
-def home(user_id):
-    if request.method=='POST':
-        if 'file' not in request.files:
-            return redirect(request.url)
-
-        file = request.files['file']
-
-        if file.filename == '':
-            return redirect(request.url)
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(file_path)
-            image_extension = file.filename.rsplit('.', 1)[1].lower()
-
-            # Save the file path to the database along with metadata
-            save_to_database(file_path,user_id,image_extension)
-            
-
-            return jsonify({"status": "success"})
-
-        return jsonify({"status": "failed"})
-    else:
-        image_data_list = get_images(user_id)
-        row=get_user_details(user_id)
-        # Render HTML to display images
-        return render_template('home.html', user_id=user_id,image_data_list=image_data_list,row=row )
     
+@app.route('/home/user/<int:user_id>', methods=['GET', 'POST'])
+def home(user_id):
+    token = request.cookies.get('jwtToken')
 
+    if not token:
+        return jsonify({'message': 'Token is missing'}), 401
 
+    username = verify_token(token)
+
+    if username:
+        # User is authenticated, continue with the request
+        if request.method == 'POST':
+            if 'file' not in request.files:
+                return redirect(request.url)
+
+            file = request.files['file']
+
+            if file.filename == '':
+                return redirect(request.url)
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                image_extension = file.filename.rsplit('.', 1)[1].lower()
+
+                # Save the file path to the database along with metadata
+                save_to_database(file_path,user_id,image_extension)
+                
+
+                return jsonify({"status": "success"})
+
+            return jsonify({"status": "failed"})
+        else:
             
-
-            
-
+            image_data_list = get_images(user_id)
+            row = get_user_details(user_id)
+            # Render HTML to display images
+            return render_template('home.html', user_id=user_id, image_data_list=image_data_list, row=row)
+    else:
+        # Token is invalid, return unauthorized response
+        return jsonify({'message': 'Invalid token'}), 401
 
 
 
 @app.route('/admin')
 def admin():
-    return render_template('admin.html',target="_self")
+    token = request.cookies.get('jwtToken')
+
+    if not token:
+        return jsonify({'message': 'Token is missing'}), 401
+
+    username = verify_token(token)
+
+    if username:
+        return render_template('admin.html',target="_self")
+    else:
+        return jsonify({'message': 'Invalid token'}), 401
 
 @app.route('/get_user_details_admin')
 def get_user_details_admin():
@@ -359,15 +395,27 @@ def delete_user(user_id):
         session.close()
         return jsonify({'status': 'failed', 'message': f'Error deleting user: {e}'})
 
+
 @app.route('/videopage/user')
 def videopage():
-    global current_user
-    user_id=current_user
-    image_data_list = get_images(user_id)
-    audio_data_list=get_audio()
-    print(len(image_data_list))
-    return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list,audio_data_list=audio_data_list)
+    token = request.cookies.get('jwtToken')
 
+    if not token:
+        return jsonify({'message': 'Token is missing'}), 401
+
+    username = verify_token(token)
+
+    if username:
+        global current_user
+        user_id=current_user
+        image_data_list = get_images(user_id)
+        audio_data_list=get_audio()
+        print(len(image_data_list))
+        return render_template('videopage.html',user_id=user_id,image_data_list=image_data_list,audio_data_list=audio_data_list)
+
+    else:
+        # Token is invalid, return unauthorized response
+        return jsonify({'message': 'Invalid token'}), 401
 
 @app.route('/create_video', methods=['POST'])
 def create_video():
