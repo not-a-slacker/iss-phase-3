@@ -38,7 +38,7 @@
         </div>
         <div class="button-container">
           <a class="codepen-button" style="text-decoration:none;"><span>Create Video</span></a>
-          <a class="codepen-button2" href="{{ url_for('logout') }}" style="text-decoration:none;"><span>Logout</span></a>
+          <a class="codepen-button2" href="{{ url_for('logout') }}"  target="_blank" style="text-decoration:none;"><span>Logout</span></a>
         </div>
       </nav>
 
@@ -278,6 +278,7 @@
           success: function(response){
             // Handle the response from the server
             console.log(response);
+            window.location.href='/videodisplay';
           },
           error: function(error){
             // Handle any errors

@@ -187,12 +187,19 @@ def get_user_details(user_id):
 def save_to_database(file_path, user_id, extension):
     try:
         session = Session()
-
+        with PIL.Image.open(file_path) as img:
+            image_metadata = {
+                'format': img.format,
+                'size': img.size,
+                'mode': img.mode,
+                'dpi': img.info.get('dpi'),  # Extract DPI if available
+                # Add more metadata fields as needed
+            }
         with open(file_path, 'rb') as file:
             image_data = file.read()
 
         # Create an Image object and add it to the session
-        image = Image(image=image_data, user_id=user_id, extension=extension)
+        image = Image(image=image_data, user_id=user_id, extension=extension,image_metadata=str(image_metadata))
         session.add(image)
         session.commit()
 
@@ -440,28 +447,21 @@ def create_video():
             # Decode the base64 encoded image
             image_data = base64.b64decode(image_url.split(',')[1])
 
-            # Convert the image data to PIL Image object
             img = PIL.Image.open(io.BytesIO(image_data))
 
-            # Ensure image is in RGB mode for compatibility
             if img.mode != 'RGB':
                 img = img.convert('RGB')
 
-            # Resize the image to match the video dimensions
             img = img.resize((width, height), resample=PIL.Image.BICUBIC)
-
-            # Compress the image to a desired quality
             
             img_io = io.BytesIO()
             img.save(img_io, 'JPEG', quality=quality_val)
             img = PIL.Image.open(img_io)
-            # Convert PIL Image to numpy array
+
             img_array = np.array(img)
 
-            # Append the image array to the video clips list
             video_clips.append(img_array)
 
-        # Create ImageSequenceClip from the list of image arrays
         if video_clips:
             final_clip = ImageSequenceClip(video_clips, fps=fps)
         else:
@@ -473,33 +473,25 @@ def create_video():
             audio_clips = []
 
             for audio in audios:
-                # Decode the base64 encoded audio
+                
                 audio_data = base64.b64decode(audio['src'].split(',')[1])
 
-                # Create a temporary file and write the decoded audio data to it
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
                     temp_audio_file.write(audio_data)
                     temp_audio_path = temp_audio_file.name
 
-                # Load the audio clip from the temporary file
                 audio_clip = AudioFileClip(temp_audio_path)
 
-                # Append the audio clip to the audio clips list
                 audio_clips.append(audio_clip)
 
-            # Concatenate all audio clips into a single long audio clip
             concatenated_audio = concatenate_audioclips(audio_clips)
 
-            # Loop the concatenated audio until it matches the video duration
             looped_audio = concatenated_audio.fx(vfx.loop, duration=final_clip.duration)
 
-            # Add the looped audio clip to the final video clip
             final_clip = final_clip.set_audio(looped_audio)
-        
-        # Define the output path for the final video
+
         output_path = os.path.join('static', 'output_video.mp4')
 
-        # Write the final video clip to the output path using H.264 codec
         final_clip.write_videofile(output_path, codec='libx264')
 
         return jsonify({"status": "success", "output": output_path})
@@ -507,6 +499,10 @@ def create_video():
     except Exception as e:
         print(f"Error creating video: {e}")
         return jsonify({"status": "failed"})
+    
+@app.route('/videodisplay')
+def videodisplay():
+    return render_template('videodisplay.html',target="_blank")
     
     
 if __name__ == '__main__':
