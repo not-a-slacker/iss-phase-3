@@ -9,27 +9,33 @@ from mutagen.mp3 import MP3
 from mutagen.wavpack import WavPack
 import numpy as np
 import io 
-from PIL import Image
+import PIL.Image
 from moviepy.editor import ImageSequenceClip, AudioFileClip, concatenate_audioclips,vfx
 import tempfile
+from sqlalchemy import create_engine, Column, Integer, String, LargeBinary
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+import cv2
+import numpy as np
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.dialects.mysql import BLOB
+import os
 
 
 current_user=-1
-password1="password"
 app = Flask(__name__)
 
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'gif'}
 app.config['DISPLAY_FOLDER'] = 'display'
 
-from prettytable import PrettyTable
+engine = create_engine(os.environ["DATABASE_URL"])
+Base = declarative_base()
+Session = sessionmaker(bind=engine)
 
-hostname = "localhost"
-username = "root"
-password = password1
-database = "iss_project"
 
-import os
+
+
 
 
 def delete_files_in_directory(directory_path):
@@ -51,376 +57,182 @@ def get_image_format(image_data):
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
+class UserDetails(Base):
+    __tablename__ = 'user_details'
+
+    user_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(1000))
+    user_name = Column(String(1000))
+    email = Column(String(1000))
+    password = Column(String(1000))
+
+class Image(Base):
+    __tablename__ = 'images'
+
+    image_id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer)
+    image = Column(BLOB)
+    image_metadata = Column(String(1000))
+    extension = Column(String(20))
+
+
+class Audio(Base):
+    __tablename__ = 'audio'
+
+    audio_id = Column(Integer, primary_key=True, autoincrement=True)
+    audio_data = Column(BLOB)
+    audio_metadata = Column(String(1000))
+
+
+
 def create_tables():
+    Base.metadata.create_all(engine)
+def insert_data(name1, username1, email1, password1):
+    session = Session()
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-
-        if connection.is_connected():
-            cursor=connection.cursor()
-            query="""CREATE TABLE  IF NOT EXISTS user_details(
-                name varchar(1000),
-                user_name varchar(1000) ,
-                email varchar(1000) ,
-                password varchar(1000) ,
-                user_id INT AUTO_INCREMENT PRIMARY KEY);"""
-            cursor.execute(query)
-            connection.commit()
-            query="""CREATE TABLE  IF NOT EXISTS  images(
-            image_id INT AUTO_INCREMENT PRIMARY KEY,
-            user_id INT  ,
-            image LONGBLOB,
-            metadata varchar(1000),
-            extension varchar(20)
-            );"""
-            cursor.execute(query)
-            connection.commit()
-            query="""CREATE TABLE  IF NOT EXISTS audio(
-                audio_id INT AUTO_INCREMENT PRIMARY KEY,
-                audio_data LONGBLOB,
-                audio_metadata varchar(1000)
-            );"""
-            cursor.execute(query)
-            connection.commit()
-    except mysql.connector.Error as e:
-        print(f"Error connecting to MySQL: {e}")
-    finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
-            print("MySQL connection closed")
-
-def insert_data(name1,username1, email1, password1):
-    try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-
-        if connection.is_connected():
-            cursor = connection.cursor()
-            query = "INSERT INTO user_details (name,user_name, email, password) VALUES (%s,%s, %s, %s)"
-            data = (name1,username1, email1, password1)
-            cursor.execute(query, data)
-            connection.commit()
-
-            print("Data inserted successfully!")
-    except mysql.connector.Error as e:
+        user = UserDetails(name=name1, user_name=username1, email=email1, password=password1)
+        session.add(user)
+        session.commit()
+        print("Data inserted successfully!")
+    except SQLAlchemyError as e:
         print(f"Error: {e}")
+        session.rollback()
     finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
-            print("MySQL connection closed")
-
-def print_table_from_mysql():
-    try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
+        session.close()
+        print("Session closed")
 
 
-        if connection.is_connected():
-            print("Connected to MySQL database")
-
-           
-            cursor = connection.cursor()
-
-            
-            query = "SELECT * FROM user_details"
-            cursor.execute(query)
-
-            
-            rows = cursor.fetchall()
-
-           
-            if rows:
-                columns = [column[0] for column in cursor.description]
-                table = PrettyTable(columns)
-                table.align = 'l' 
-
-                for row in rows:
-                    table.add_row(row)
-
-                print(table)
-            else:
-                print("No data found in the table.")
-
-    except mysql.connector.Error as e:
-        print(f"Error connecting to MySQL: {e}")
-
-    finally:
-        
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
-            print("MySQL connection closed")
 
 def search_for_JUST_username(username_user):
+    session = Session()
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        if connection.is_connected():
-            cursor=connection.cursor(buffered=True)
-            query="SELECT * FROM user_details WHERE user_name=%s"
-            data=(username_user,)
-            cursor.execute(query,data)
-            connection.commit()
-            row=cursor.fetchone()
-            if row:
-                connection.close()
-                print("MySQL connection closed")
-                return row[4]
-            
-            else:
-                connection.close()
-                print("MySQL connection closed")
-                return 0
-    
-    except mysql.connector.Error as e:
-            print(f"Error: {e}")
+        # Query the user_details table for a specific username
+        user = session.query(UserDetails).filter(UserDetails.user_name == username_user).first()
+        
+        if user:
+            return user.user_id
+        else:
             return 0
+    except Exception as e:
+        print(f"Error: {e}")
+        return 0
     finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
-            print("MySQL connection closed")
-            return 0
-    return 0
+        session.close()
+        print("Session closed")
 
-def search_for_user(username_user,password_user):
+
+def search_for_user(username_user, password_user):
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        if connection.is_connected():
-            cursor=connection.cursor(buffered=True)
-            query="SELECT * FROM user_details WHERE user_name=%s AND password=%s"
-            data=(username_user,password_user)
-            cursor.execute(query,data)
-            connection.commit()
-            row=cursor.fetchone()
-            if row:
-                connection.close()
-                print("MySQL connection closed")
-                return row[4]
-            
-            else:
-                connection.close()
-                print("MySQL connection closed")
-                return 0
-    
-    except mysql.connector.Error as e:
-            print(f"Error: {e}")
-            return 0
-    finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        session = Session()
+
+        user = session.query(UserDetails).filter_by(user_name=username_user, password=password_user).first()
+
+        if user:
+            user_id = user.user_id
+            session.close()
+            print("MySQL connection closed")
+            return user_id
+        else:
+            session.close()
             print("MySQL connection closed")
             return 0
-    return 0
+    
+    except SQLAlchemyError as e:
+        print(f"Error: {e}")
+        return 0
+
 def get_user_details(user_id):
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        if connection.is_connected():
-            cursor=connection.cursor(buffered=True)
-            query="SELECT * FROM user_details WHERE user_id=%s"
-            data=(user_id,)
-            cursor.execute(query,data)
-            connection.commit()
-            row=cursor.fetchone()
-            if row:
-                connection.close()
-                print("MySQL connection closed")
-                return row
-            
-            else:
-                connection.close()
-                print("MySQL connection closed")
-                return 0
+        session = Session()
 
-    except mysql.connector.Error as e:
-            print(f"Error: {e}")
-            return None
-    finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        user = session.query(UserDetails).filter_by(user_id=user_id).first()
+
+        if user:
+            user_details = {
+                'name': user.name,
+                'user_name': user.user_name,
+                'email': user.email,
+                'password': user.password,
+                'user_id': user.user_id
+            }
+            session.close()
+            print("MySQL connection closed")
+            return user_details
+        else:
+            session.close()
             print("MySQL connection closed")
             return None
 
-    
-def save_to_database(file_path, a,extension):
+    except SQLAlchemyError as e:
+        print(f"Error: {e}")
+        return None
+def save_to_database(file_path, user_id, extension):
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
+        session = Session()
 
-        if connection.is_connected():
-            cursor = connection.cursor()
+        with open(file_path, 'rb') as file:
+            image_data = file.read()
 
-            # Open the file and read the binary data
-            with open(file_path, 'rb') as file:
-                image_data = file.read()
-               
+        # Create an Image object and add it to the session
+        image = Image(image=image_data, user_id=user_id, extension=extension)
+        session.add(image)
+        session.commit()
 
-            # Insert the data into the images table along with metadata
-            query = "INSERT INTO images (image,user_id,extension) VALUES (%s, %s,%s)"
-            cursor.execute(query, (image_data, a,extension))
-
-            connection.commit()
-
-    except mysql.connector.Error as e:
-        print(f"Error connecting to MySQL: {e}")
+    except Exception as e:
+        print(f"Error: {e}")
+        session.rollback()  # Rollback the transaction in case of error
 
     finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        session.close()
+
+
 def get_audio():
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        cursor = connection.cursor()
+        session = Session()
 
-        # Retrieve images for the specified user_id from the database
-        query = "SELECT audio_data from audio;"
-        cursor.execute(query)
-        audios = cursor.fetchall()
+        # Retrieve audio data from the database
+        audios = session.query(Audio.audio_data).all()
 
         audio_data_list = []
         for audio_data in audios:
-            # Convert image_data to base64 for embedding in HTML
-            encoded_audio=(base64.b64encode(audio_data[0])).decode('utf-8')
-            print(encoded_audio[:10])
+            # Convert audio_data to base64 for embedding in HTML
+            encoded_audio = base64.b64encode(audio_data[0]).decode('utf-8')
             audio_data_list.append(f"data:audio/mp3;base64,{encoded_audio}")
 
         return audio_data_list
 
+    except Exception as e:
+        print(f"Error: {e}")
+
     finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        session.close()
 def get_images(user_id):
     try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        cursor = connection.cursor()
+        session = Session()
 
         # Retrieve images for the specified user_id from the database
-        query = "SELECT image, extension FROM images WHERE user_id = %s"
-        cursor.execute(query, (user_id,))
-        images = cursor.fetchall()
+        images = session.query(Image.image, Image.extension).filter_by(user_id=user_id).all()
 
         image_data_list = []
         for image_data, image_extension in images:
             # Convert image_data to base64 for embedding in HTML
-            encoded_image=(base64.b64encode(image_data)).decode('utf-8')
-
+            encoded_image = base64.b64encode(image_data).decode('utf-8')
             image_data_list.append(f"data:image/{image_extension};base64,{encoded_image}")
 
         return image_data_list
 
-    finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
-
-def get_audio_metadata(file_path):
-    """
-    Extracts audio metadata using mutagen.
-    Supports MP3, WAV formats.
-    """
-    metadata = {}
-    if file_path.endswith(".mp3"):
-        audio = MP3(file_path)
-        metadata['title']=str(file_path[:len(file_path)-4])
-        metadata['length'] = audio.info.length
-        metadata['bitrate'] = audio.info.bitrate
-    elif file_path.endswith(".wav"):
-        audio = WavPack(file_path)
-        metadata['title']=str(file_path[:len(file_path)-4])
-        metadata['length'] = audio.info.length
-        metadata['bitrate'] = audio.info.bitrate
-    return metadata
-
-def store_audio_files_in_db(audio_files_directory):
-    # Connect to the database
-    connection = mysql.connector.connect(
-        host=hostname,
-        user=username,
-        password=password1,
-        database=database
-    )
-    cursor = connection.cursor()
-
-    # Iterate over audio files in the directory
-    for filename in os.listdir(audio_files_directory):
-        if filename.endswith(".mp3") or filename.endswith(".wav"):  
-            file_path = os.path.join(audio_files_directory, filename)
-            
-            # Extract audio metadata
-            metadata = get_audio_metadata(file_path)
-
-            # Store audio data as BLOB
-            with open(file_path, 'rb') as file:
-                audio_data = file.read()
-
-            # Insert data into the database
-            sql = "INSERT INTO audio (audio_data, audio_metadata) VALUES (%s, %s)"
-            cursor.execute(sql, (audio_data, str(metadata)))
-
-    # Commit changes and close connections
-    connection.commit()
-    cursor.close()
-    connection.close()
-
-
-@app.route('/get_all_image_ids/<int:user_id>')
-def get_all_image_ids(user_id):
-    try:
-        connection = mysql.connector.connect(
-            host=hostname,
-            user=username,
-            password=password,
-            database=database
-        )
-        cursor = connection.cursor()
-
-        # Retrieve all image IDs for the specified user_id
-        query = "SELECT image_id FROM images WHERE user_id = %s"
-        cursor.execute(query, (user_id,))
-        image_ids = [row[0] for row in cursor.fetchall()]
-
-        return jsonify(image_ids)
+    except Exception as e:
+        print(f"Error: {e}")
 
     finally:
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        session.close()
+
+
+
+
+
+
+
 
 @app.route('/')
 @app.route('/index')
@@ -505,10 +317,7 @@ def home(user_id):
 
             
 
-@app.route('/display/<int:user_id>/<path:image_id>',methods=['GET','POST'])
-def display_image(user_id, image_id):
-    # Serve the requested image from the 'display' folder
-    return send_from_directory(app.config['DISPLAY_FOLDER'], image_id)
+
 
 
 @app.route('/admin')
@@ -545,21 +354,20 @@ def create_video():
             image_data = base64.b64decode(image_url.split(',')[1])
 
             # Convert the image data to PIL Image object
-            img = Image.open(io.BytesIO(image_data))
+            img = PIL.Image.open(io.BytesIO(image_data))
 
             # Ensure image is in RGB mode for compatibility
             if img.mode != 'RGB':
                 img = img.convert('RGB')
 
             # Resize the image to match the video dimensions
-            img = img.resize((width, height), resample=Image.BICUBIC)
+            img = img.resize((width, height), resample=PIL.Image.BICUBIC)
 
             # Compress the image to a desired quality
             
             img_io = io.BytesIO()
             img.save(img_io, 'JPEG', quality=quality_val)
-            img = Image.open(img_io)
-            
+            img = PIL.Image.open(img_io)
             # Convert PIL Image to numpy array
             img_array = np.array(img)
 
@@ -616,17 +424,4 @@ def create_video():
     
 if __name__ == '__main__':
     create_tables()
-    flag=0
-    with open("audio_flag.txt","r+") as f:
-        a=int(f.read())
-        if(a==0):
-            store_audio_files_in_db("static/audio")
-            flag=1
-    if flag==1:
-        with open("audio_flag.txt","w") as f:
-            f.write("1")
-    
-        
-            
-        
     app.run(debug=True)
