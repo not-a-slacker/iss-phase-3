@@ -245,8 +245,11 @@ def login():
     if request.method=='POST':
         username_login=request.form['username']
         password_login=request.form['password']
+        if username_login=='admin' and password_login=='admin':
+            return redirect(url_for('admin'))
         hashed_password_login = hashlib.sha256(password_login.encode()).hexdigest()
         a=search_for_user(username_login,hashed_password_login)
+        delete_files_in_directory(app.config['UPLOAD_FOLDER'])
         if a==0:
             return render_template('login.html', login_failed=True)
         else:
@@ -261,6 +264,7 @@ def login():
 def signup():
     
     if request.method=='POST':
+        delete_files_in_directory(app.config['UPLOAD_FOLDER'])
         username_user=request.form['username']
         name_user=request.form['name']
         email_user=request.form['email']
@@ -323,6 +327,37 @@ def home(user_id):
 @app.route('/admin')
 def admin():
     return render_template('admin.html',target="_self")
+
+@app.route('/get_user_details_admin')
+def get_user_details_admin():
+    session = Session()
+    users = session.query(UserDetails).all()
+    user_details = [{
+        'user_id': user.user_id,
+        'name': user.name,
+        'user_name': user.user_name,
+        'email': user.email
+    } for user in users]
+    session.close()
+    return jsonify(user_details)
+
+@app.route('/delete_user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    session = Session()
+    try:
+        user = session.query(UserDetails).filter_by(user_id=user_id).first()
+        if user:
+            session.delete(user)
+            session.commit()
+            session.close()
+            return jsonify({'status': 'success', 'message': 'User deleted successfully'})
+        else:
+            session.close()
+            return jsonify({'status': 'failed', 'message': 'User not found'})
+    except Exception as e:
+        session.rollback()
+        session.close()
+        return jsonify({'status': 'failed', 'message': f'Error deleting user: {e}'})
 
 @app.route('/videopage/user')
 def videopage():
